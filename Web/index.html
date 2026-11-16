@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>MORADORES RURAIS - BITURUNA</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --verde:#1f4d2b; --verde2:#2f6b3d; --amarelo:#ffd23f; --cinza:#b8bdc2; --tinta:#1b1f1d; }
+  html, body { height:100%; margin:0; font-family:"Segoe UI", Roboto, Arial, sans-serif; color:var(--tinta); }
+  #map { position:absolute; inset:0; background:#0d1410; }
+
+  #painel { position:absolute; z-index:1000; top:10px; left:54px; width:min(380px, calc(100vw - 118px)); }
+  #titulo { background:var(--verde); color:#fff; padding:9px 12px; border-radius:8px 8px 0 0;
+            font-weight:700; letter-spacing:.06em; font-size:14px; }
+  #titulo small { display:block; font-weight:400; letter-spacing:.02em; opacity:.8; font-size:11.5px; margin-top:2px; }
+  #busca-box { position:relative; background:#fff; border-radius:0 0 8px 8px; box-shadow:0 2px 10px rgba(0,0,0,.45); }
+  #busca { width:100%; box-sizing:border-box; border:0; outline:0; padding:11px 36px 11px 12px; font-size:15px;
+           border-radius:0 0 8px 8px; text-transform:uppercase; background:transparent; }
+  #busca::placeholder { text-transform:none; color:#7b837e; }
+  #limpar { position:absolute; right:4px; top:4px; width:32px; height:32px; border:0; background:none; font-size:20px;
+            color:#6b726e; cursor:pointer; display:none; }
+  #resultados { background:#fff; margin-top:4px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.45);
+                max-height:min(55vh, 420px); overflow:auto; display:none; }
+  .grupo { font-size:11px; font-weight:700; letter-spacing:.08em; color:var(--verde2); padding:8px 12px 4px; background:#f1f5f2; position:sticky; top:0; }
+  .item { padding:8px 12px; cursor:pointer; border-top:1px solid #edf0ee; font-size:13.5px; }
+  .item:hover, .item.ativo { background:#e6f1e8; }
+  .item span { display:block; font-size:11.5px; color:#66706a; margin-top:1px; }
+  .vazio { padding:12px; font-size:13px; color:#66706a; }
+
+  #resumo { position:absolute; z-index:1000; left:10px; bottom:26px; background:rgba(255,255,255,.95); border-radius:8px;
+            box-shadow:0 2px 10px rgba(0,0,0,.45); padding:10px 12px; font-size:12.5px; max-width:min(300px, calc(100vw - 20px)); }
+  #resumo h4 { margin:0 0 6px; font-size:12px; letter-spacing:.06em; color:var(--verde); }
+  #resumo .num { display:flex; gap:14px; margin-bottom:8px; }
+  #resumo .num b { display:block; font-size:19px; color:var(--tinta); }
+  #resumo .num div { font-size:11px; color:#66706a; }
+  .leg { display:flex; align-items:center; gap:7px; margin-top:3px; }
+  .bola { width:11px; height:11px; border-radius:50%; border:1.5px solid #1b1f1d; display:inline-block; }
+  .linha { width:16px; height:0; border-top:2.5px solid #fff; outline:1px solid #555; display:inline-block; }
+  #ver-tudo { margin-top:8px; border:0; background:var(--verde); color:#fff; border-radius:5px; padding:6px 10px; font-size:12px; cursor:pointer; display:none; }
+
+  .rotulo-com { background:none; border:0; box-shadow:none; color:#fff; font-weight:700; font-size:11px; letter-spacing:.04em;
+                text-shadow:0 0 3px #000, 0 0 3px #000, 0 0 2px #000; white-space:nowrap; }
+  .rotulo-com::before { display:none; }
+  .rotulo-nome { color:#fff; font-weight:600; white-space:nowrap; line-height:1; pointer-events:none;
+                 text-shadow:0 0 3px #000, 0 0 3px #000, 0 0 2px #000, 0 0 1px #000; }
+  .rotulo-nome.sem { color:#d5d9dc; font-weight:400; }
+  .pop h3 { margin:0 0 6px; font-size:14px; color:var(--verde); }
+  .pop table { border-collapse:collapse; font-size:12.5px; }
+  .pop td { padding:2px 8px 2px 0; vertical-align:top; }
+  .pop td:first-child { color:#66706a; white-space:nowrap; }
+  #porta { position:fixed; inset:0; z-index:5000; background:#0d1410; display:flex; align-items:center; justify-content:center; padding:16px; }
+  #porta form { background:#fff; border-radius:10px; width:min(360px,100%); overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,.6); }
+  #porta h1 { margin:0; background:var(--verde); color:#fff; font-size:15px; letter-spacing:.06em; padding:14px 16px; }
+  #porta .corpo { padding:16px; }
+  #porta p { margin:0 0 12px; font-size:13.5px; color:#444c47; }
+  #porta input { width:100%; box-sizing:border-box; padding:11px 12px; font-size:16px; border:1.5px solid #b9c2bc; border-radius:6px; }
+  #porta input:focus { outline:0; border-color:var(--verde2); }
+  #porta button { margin-top:12px; width:100%; padding:11px; font-size:15px; border:0; border-radius:6px; background:var(--verde); color:#fff; cursor:pointer; }
+  #porta button:disabled { opacity:.6; cursor:wait; }
+  #porta-erro { color:#b3261e; font-size:13px; margin-top:10px; min-height:18px; }
+  @media (max-width:520px) { #titulo small { display:none; } #resumo { bottom:22px; } }
+</style>
+</head>
+<body>
+<div id="porta">
+  <form id="porta-form" autocomplete="off">
+    <h1>MORADORES RURAIS - BITURUNA</h1>
+    <div class="corpo">
+      <p>Acesso restrito. Digite a senha para abrir o mapa.</p>
+      <input id="porta-senha" type="password" placeholder="Senha" autofocus>
+      <button id="porta-botao" type="submit">Abrir mapa</button>
+      <div id="porta-erro"></div>
+    </div>
+  </form>
+</div>
+<div id="map"></div>
+
+<div id="painel">
+  <div id="titulo">MORADORES RURAIS - BITURUNA<small>Localização, comunidade e número de moradores</small></div>
+  <div id="busca-box">
+    <input id="busca" type="search" autocomplete="off" placeholder="Buscar por nome ou comunidade...">
+    <button id="limpar" title="Limpar busca">&times;</button>
+  </div>
+  <div id="resultados"></div>
+</div>
+
+<div id="resumo">
+  <h4 id="resumo-titulo">TODAS AS COMUNIDADES</h4>
+  <div class="num">
+    <div><b id="n-pontos">0</b>pontos</div>
+    <div><b id="n-moradores">0</b>moradores</div>
+    <div><b id="n-ocupados">0</b>pontos com moradores</div>
+  </div>
+  <div class="leg"><span class="bola" style="background:var(--amarelo)"></span> Com moradores</div>
+  <div class="leg"><span class="bola" style="background:var(--cinza)"></span> Sem moradores / não encontrado</div>
+  <div class="leg"><span class="linha"></span> Limite de comunidade</div>
+  <button id="ver-tudo">Ver todas as comunidades</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data/dados.enc.js"></script>
+<script>
+// ---------- acesso por senha ----------
+// Os dados (data/dados.enc.js) estão criptografados com AES-256-GCM. A chave é derivada da senha
+// digitada (PBKDF2-SHA256); a senha não está guardada em nenhum arquivo. Senha errada = não abre.
+(function () {
+  function b64(s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+  var form = document.getElementById('porta-form'), campo = document.getElementById('porta-senha'),
+      botao = document.getElementById('porta-botao'), erro = document.getElementById('porta-erro');
+  if (typeof DADOS_CRIPTO === 'undefined') {
+    erro.textContent = 'Arquivo data/dados.enc.js não encontrado. Gere-o com o gerador da pasta privada.';
+    botao.disabled = true; return;
+  }
+  if (!window.crypto || !crypto.subtle) {
+    erro.textContent = 'Este navegador não permite abrir os dados aqui. Acesse pelo endereço https do site.';
+    botao.disabled = true; return;
+  }
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!campo.value) return;
+    botao.disabled = true; botao.textContent = 'Abrindo...'; erro.textContent = '';
+    var d = DADOS_CRIPTO;
+    crypto.subtle.importKey('raw', new TextEncoder().encode(campo.value), 'PBKDF2', false, ['deriveKey'])
+      .then(function (k) {
+        return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(d.salt), iterations: d.iter, hash: 'SHA-256' },
+          k, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      })
+      .then(function (k) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(d.iv) }, k, b64(d.ct)); })
+      .then(function (buf) {
+        var dados = JSON.parse(new TextDecoder().decode(buf));
+        campo.value = '';
+        document.getElementById('porta').remove();
+        iniciarMapa(dados.comunidades, dados.moradores);
+      })
+      .catch(function () {
+        botao.disabled = false; botao.textContent = 'Abrir mapa';
+        erro.textContent = 'Senha incorreta.'; campo.select();
+      });
+  });
+})();
+
+function iniciarMapa(COMUNIDADES, MORADORES) {
+  // ---------- utilidades ----------
+  function norm(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim(); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function $(id) { return document.getElementById(id); }
+
+  // ---------- mapa e fundos ----------
+  var map = L.map('map', { preferCanvas: true, zoomControl: true, maxZoom: 20 });
+  var satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, maxNativeZoom: 18, attribution: 'Imagem: Esri, Maxar, Earthstar Geographics' }).addTo(map);
+  var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, attribution: 'Imagem: Google' });
+  var ruas = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap' });
+  L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+
+  // ---------- comunidades (polígonos) ----------
+  var camadaCom = L.layerGroup().addTo(map);
+  var polPorNome = {};
+  COMUNIDADES.forEach(function (c) {
+    var p = L.polygon(c.r, { color: '#ffffff', weight: 1.6, opacity: .9, fillColor: '#ffffff', fillOpacity: .03, interactive: false });
+    p.bindTooltip(c.n, { permanent: true, direction: 'center', className: 'rotulo-com' });
+    p.addTo(camadaCom);
+    var chaves = [norm(c.n)]; if (c.d && norm(c.d) !== chaves[0]) chaves.push(norm(c.d));
+    chaves.forEach(function (k) { (polPorNome[k] = polPorNome[k] || []).push(p); });
+  });
+  function rotulos() { $('map').classList.toggle('sem-rotulo', map.getZoom() < 12); }
+  var st = document.createElement('style'); st.textContent = '.sem-rotulo .rotulo-com{display:none}'; document.head.appendChild(st);
+  map.on('zoomend', rotulos);
+
+  // ---------- moradores (pontos) ----------
+  var camadaPts = L.layerGroup().addTo(map);
+  var pontos = MORADORES.map(function (m, i) {
+    var o = { i: i, lat: m[0], lng: m[1], nome: m[2] || 'NÃO INFORMADO', com: m[3] || 'NÃO INFORMADA', mor: m[4] };
+    o.nNome = norm(o.nome); o.nCom = norm(o.com);
+    o.mk = L.circleMarker([o.lat, o.lng], estilo(o, false));
+    o.mk.bindPopup(function () {
+      return '<div class="pop"><h3>' + esc(o.nome) + '</h3><table>' +
+        '<tr><td>Comunidade</td><td>' + esc(o.com) + '</td></tr>' +
+        '<tr><td>Nº de moradores</td><td><b>' + o.mor + '</b></td></tr>' +
+        '<tr><td>Localização</td><td>' + o.lat.toFixed(5) + ', ' + o.lng.toFixed(5) + '</td></tr></table></div>';
+    });
+    o.mk.addTo(camadaPts);
+    return o;
+  });
+  function estilo(o, apagado) {
+    return { radius: 5.5, color: '#1b1f1d', weight: 1.2, opacity: apagado ? .25 : 1,
+             fillColor: o.mor > 0 ? '#ffd23f' : '#b8bdc2', fillOpacity: apagado ? .15 : .95 };
+  }
+
+  // ---------- nomes ao lado dos pontos ----------
+  // Aparecem a partir do zoom 16, crescem ao aproximar e somem ao afastar.
+  // Um nome só é desenhado se não ficar por cima de outro; pontos com moradores têm prioridade
+  // e os registros sem morador ("MORADOR NÃO ENCONTRADO", "CASA ABANDONADA"...) só entram no zoom 18+.
+  var ZOOM_NOMES = 16, ZOOM_SEM_MORADOR = 18, MAX_NOMES = 350;
+  var camadaNomes = L.layerGroup().addTo(map);
+  var comSel = null;
+  function desenharNomes() {
+    camadaNomes.clearLayers();
+    var z = map.getZoom();
+    if (!map.hasLayer(camadaNomes) || !map.hasLayer(camadaPts) || z < ZOOM_NOMES) return;
+    var fonte = z >= 19 ? 14 : z >= 18 ? 13 : z >= 17 ? 11.5 : 10;
+    var lim = map.getBounds().pad(0.05), tam = map.getSize(), usados = [], n = 0;
+    var cand = pontos.filter(function (o) {
+      return lim.contains([o.lat, o.lng]) && (o.mor > 0 || z >= ZOOM_SEM_MORADOR) && (!comSel || o.nCom === comSel);
+    });
+    cand.sort(function (a, b) { return (b.mor > 0) - (a.mor > 0) || b.mor - a.mor || a.i - b.i; });
+    for (var k = 0; k < cand.length && n < MAX_NOMES; k++) {
+      var o = cand[k], p = map.latLngToContainerPoint([o.lat, o.lng]);
+      var w = o.nome.length * fonte * 0.62 + 4, h = fonte + 4;
+      var cx = { x1: p.x + 8, y1: p.y - h / 2, x2: p.x + 8 + w, y2: p.y + h / 2 };
+      if (cx.x1 > tam.x || cx.x2 < 0) continue;
+      var livre = true;
+      for (var j = 0; j < usados.length; j++) {
+        var u = usados[j];
+        if (cx.x1 < u.x2 && cx.x2 > u.x1 && cx.y1 < u.y2 && cx.y2 > u.y1) { livre = false; break; }
+      }
+      if (!livre) continue;
+      usados.push(cx); n++;
+      L.marker([o.lat, o.lng], { interactive: false, keyboard: false, icon: L.divIcon({
+        className: 'rotulo-nome' + (o.mor > 0 ? '' : ' sem'), iconSize: [0, 0], iconAnchor: [-9, fonte / 2],
+        html: '<span style="font-size:' + fonte + 'px">' + esc(o.nome) + '</span>' }) }).addTo(camadaNomes);
+    }
+  }
+  map.on('moveend zoomend overlayadd overlayremove', desenharNomes);
+
+  L.control.layers(
+    { 'Satélite (Esri)': satelite, 'Satélite (Google)': googleSat, 'Mapa de ruas': ruas },
+    { 'Moradores': camadaPts, 'Nomes dos moradores': camadaNomes, 'Comunidades': camadaCom }, { position: 'topright' }).addTo(map);
+
+  // ---------- lista de comunidades para a busca ----------
+  var coms = {};
+  pontos.forEach(function (o) {
+    var c = coms[o.nCom] = coms[o.nCom] || { nome: o.com, n: o.nCom, pts: 0, mor: 0, ocup: 0 };
+    c.pts++; c.mor += o.mor; if (o.mor > 0) c.ocup++;
+  });
+  // polígonos sem nenhum ponto cadastrado também entram na busca
+  COMUNIDADES.forEach(function (c) { var n = norm(c.n); if (!c.d && !coms[n]) coms[n] = { nome: c.n, n: n, pts: 0, mor: 0, ocup: 0 }; });
+  var listaCom = Object.keys(coms).map(function (k) { return coms[k]; }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt'); });
+
+  // ---------- resumo ----------
+  function resumo(titulo, lista) {
+    var mor = 0, oc = 0; lista.forEach(function (o) { mor += o.mor; if (o.mor > 0) oc++; });
+    $('resumo-titulo').textContent = titulo;
+    $('n-pontos').textContent = lista.length.toLocaleString('pt-BR');
+    $('n-moradores').textContent = mor.toLocaleString('pt-BR');
+    $('n-ocupados').textContent = oc.toLocaleString('pt-BR');
+  }
+
+  // ---------- seleção ----------
+  var destaque = null;
+  function limparSelecao() {
+    pontos.forEach(function (o) { o.mk.setStyle(estilo(o, false)); });
+    Object.keys(polPorNome).forEach(function (k) { polPorNome[k].forEach(function (p) { p.setStyle({ color: '#ffffff', weight: 1.6 }); }); });
+    if (destaque) { map.removeLayer(destaque); destaque = null; }
+    resumo('TODAS AS COMUNIDADES', pontos);
+    $('ver-tudo').style.display = 'none';
+    comSel = null; desenharNomes();
+  }
+  function selecionarComunidade(c) {
+    limparSelecao();
+    var lista = pontos.filter(function (o) { return o.nCom === c.n; });
+    pontos.forEach(function (o) { if (o.nCom !== c.n) o.mk.setStyle(estilo(o, true)); else o.mk.bringToFront(); });
+    var b = L.latLngBounds([]);
+    lista.forEach(function (o) { b.extend([o.lat, o.lng]); });
+    var pols = polPorNome[c.n] || [];
+    pols.forEach(function (p) { p.setStyle({ color: '#ffd23f', weight: 3 }); b.extend(p.getBounds()); });
+    if (b.isValid()) map.fitBounds(b.pad(0.08), { maxZoom: 17 });
+    resumo('COMUNIDADE ' + c.nome, lista);
+    comSel = c.n; desenharNomes();
+    $('ver-tudo').style.display = 'inline-block';
+    map.closePopup();
+  }
+  function selecionarPessoa(o) {
+    limparSelecao();
+    if (!map.hasLayer(camadaPts)) map.addLayer(camadaPts);
+    destaque = L.circleMarker([o.lat, o.lng], { radius: 13, color: '#ffd23f', weight: 3, fill: false, interactive: false }).addTo(map);
+    map.setView([o.lat, o.lng], Math.max(map.getZoom(), 18));
+    o.mk.openPopup();
+    $('ver-tudo').style.display = 'inline-block';
+  }
+  $('ver-tudo').onclick = function () { limparSelecao(); map.closePopup(); map.fitBounds(todos.pad(0.03)); };
+
+  // ---------- busca ----------
+  var campo = $('busca'), caixa = $('resultados'), itens = [], ativo = -1;
+  function buscar() {
+    var q = norm(campo.value);
+    $('limpar').style.display = campo.value ? 'block' : 'none';
+    itens = []; ativo = -1;
+    if (q.length < 2) { caixa.style.display = 'none'; return; }
+    var termos = q.split(/\s+/);
+    function bate(t) { return termos.every(function (x) { return t.indexOf(x) >= 0; }); }
+    var cs = listaCom.filter(function (c) { return bate(c.n); });
+    var ps = pontos.filter(function (o) { return bate(o.nNome); });
+    ps.sort(function (a, b) { return (a.nNome.indexOf(q) === 0 ? 0 : 1) - (b.nNome.indexOf(q) === 0 ? 0 : 1) || a.nome.localeCompare(b.nome, 'pt'); });
+    var total = ps.length; ps = ps.slice(0, 40);
+    var h = '';
+    if (cs.length) {
+      h += '<div class="grupo">COMUNIDADES (' + cs.length + ')</div>';
+      cs.forEach(function (c) { h += '<div class="item" data-k="' + itens.length + '">' + esc(c.nome) + '<span>' + c.pts + ' pontos · ' + c.mor + ' moradores</span></div>'; itens.push({ t: 'c', v: c }); });
+    }
+    if (ps.length) {
+      h += '<div class="grupo">PESSOAS (' + total + (total > ps.length ? ', mostrando ' + ps.length : '') + ')</div>';
+      ps.forEach(function (o) { h += '<div class="item" data-k="' + itens.length + '">' + esc(o.nome) + '<span>' + esc(o.com) + ' · ' + o.mor + (o.mor === 1 ? ' morador' : ' moradores') + '</span></div>'; itens.push({ t: 'p', v: o }); });
+    }
+    if (!itens.length) h = '<div class="vazio">Nenhum resultado para "' + esc(campo.value) + '".</div>';
+    caixa.innerHTML = h; caixa.style.display = 'block'; caixa.scrollTop = 0;
+  }
+  function escolher(k) {
+    var it = itens[k]; if (!it) return;
+    caixa.style.display = 'none'; campo.blur();
+    campo.value = it.v.nome; $('limpar').style.display = 'block';
+    if (it.t === 'c') selecionarComunidade(it.v); else selecionarPessoa(it.v);
+  }
+  campo.addEventListener('input', buscar);
+  campo.addEventListener('focus', buscar);
+  campo.addEventListener('keydown', function (e) {
+    var els = caixa.querySelectorAll('.item');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!els.length) return; e.preventDefault();
+      ativo = (ativo + (e.key === 'ArrowDown' ? 1 : -1) + els.length) % els.length;
+      els.forEach(function (x, i) { x.classList.toggle('ativo', i === ativo); });
+      els[ativo].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') { e.preventDefault(); escolher(ativo >= 0 ? ativo : 0); }
+    else if (e.key === 'Escape') { caixa.style.display = 'none'; }
+  });
+  caixa.addEventListener('click', function (e) { var it = e.target.closest('.item'); if (it) escolher(+it.getAttribute('data-k')); });
+  $('limpar').onclick = function () { campo.value = ''; buscar(); limparSelecao(); map.closePopup(); campo.focus(); };
+  map.on('click', function () { caixa.style.display = 'none'; });
+  ['painel', 'resumo'].forEach(function (id) { L.DomEvent.disableClickPropagation($(id)); L.DomEvent.disableScrollPropagation($(id)); });
+
+  // ---------- vista inicial e endereço (#zoom/lat/lng, como no Projeto Araucárias) ----------
+  var todos = L.latLngBounds(pontos.map(function (o) { return [o.lat, o.lng]; }));
+  var h = location.hash.replace('#', '').split('/').map(Number);
+  if (h.length === 3 && h.every(isFinite)) map.setView([h[1], h[2]], h[0]); else map.fitBounds(todos.pad(0.03));
+  map.on('moveend', function () {
+    var c = map.getCenter();
+    history.replaceState(null, '', '#' + map.getZoom() + '/' + c.lat.toFixed(5) + '/' + c.lng.toFixed(5));
+  });
+  rotulos(); desenharNomes();
+  resumo('TODAS AS COMUNIDADES', pontos);
+}
+</script>
+</body>
+</html>
